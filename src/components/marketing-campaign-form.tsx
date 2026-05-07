@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { User, Mail, Phone, ChevronRight, ChevronLeft, Lock, Globe, Instagram, Facebook, Upload, Zap, BarChart, Heart, DollarSign,Monitor,ShoppingBag,Building2,Rocket,Sparkles,Target,CloudUpload,Highlighter, Users, CalendarIcon, Check, BadgeInfo} from 'lucide-react';
+import { User, Mail, Phone, ChevronRight, ChevronLeft, Lock, Globe, Instagram, Facebook, Upload, Zap, BarChart, Heart, DollarSign, Monitor, ShoppingBag, Building2, Rocket, Sparkles, Target, CloudUpload, Highlighter, Users, CalendarIcon, Check, BadgeInfo } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {Popover,PopoverContent,PopoverTrigger,} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover";
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "./ui/checkbox";
 import { useTranslation } from 'react-i18next';
 import { Calendar } from "@/components/ui/calendar";
+import Swal from 'sweetalert2';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^\+?[0-9\s\-()]{8,20}$/;
@@ -21,6 +22,7 @@ const OnboardingForm = () => {
   const { t, i18n } = useTranslation();
   const [currentStep, setCurrentStep] = useState(1);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isRTL = i18n.language === 'ar';
 
   const [formData, setFormData] = useState({
@@ -82,23 +84,23 @@ const OnboardingForm = () => {
 
     switch (field) {
       case 'fullName':
-        if (formData.fullName.trim().length > 0 && formData.fullName.trim().length <= 2) 
+        if (formData.fullName.trim().length > 0 && formData.fullName.trim().length <= 2)
           return t('onboarding.errors.name_required');
         return null;
       case 'email':
-        if (formData.email.trim().length > 0 && !EMAIL_REGEX.test(formData.email)) 
+        if (formData.email.trim().length > 0 && !EMAIL_REGEX.test(formData.email))
           return t('onboarding.errors.email_invalid');
         return null;
       case 'whatsapp':
-        if (formData.whatsapp.trim().length > 0 && !PHONE_REGEX.test(formData.whatsapp)) 
+        if (formData.whatsapp.trim().length > 0 && !PHONE_REGEX.test(formData.whatsapp))
           return t('onboarding.errors.whatsapp_invalid');
         return null;
       case 'companyName':
-        if (formData.companyName.trim().length > 0 && formData.companyName.trim().length <= 1) 
+        if (formData.companyName.trim().length > 0 && formData.companyName.trim().length <= 1)
           return t('onboarding.errors.company_required');
         return null;
       case 'websiteUrl':
-        if (!formData.noWebsite && formData.websiteUrl.trim().length > 0 && !URL_REGEX.test(formData.websiteUrl)) 
+        if (!formData.noWebsite && formData.websiteUrl.trim().length > 0 && !URL_REGEX.test(formData.websiteUrl))
           return t('onboarding.errors.url_invalid');
         return null;
       default:
@@ -112,13 +114,13 @@ const OnboardingForm = () => {
 
   const toggleArrayItem = (field: 'brandVoice' | 'idealCustomer', item: string) => {
     const current = formData[field];
-    
+
     if (field === 'brandVoice') {
       if (item === 'Skip this') {
-        updateFormData({ 
-          brandVoice: [], 
+        updateFormData({
+          brandVoice: [],
           customBrandVoice: '',
-          skippedBrandVoice: !formData.skippedBrandVoice 
+          skippedBrandVoice: !formData.skippedBrandVoice
         });
         return;
       }
@@ -130,10 +132,10 @@ const OnboardingForm = () => {
       }
     } else if (field === 'idealCustomer') {
       if (item === 'Skip this') {
-        updateFormData({ 
-          idealCustomer: [], 
+        updateFormData({
+          idealCustomer: [],
           customIdealCustomer: '',
-          skippedIdealCustomer: !formData.skippedIdealCustomer 
+          skippedIdealCustomer: !formData.skippedIdealCustomer
         });
         return;
       }
@@ -145,6 +147,88 @@ const OnboardingForm = () => {
       }
     }
   };
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    
+    Swal.fire({
+      title: i18n.language === 'ar' ? 'جاري الإرسال...' : 'Sending...',
+      allowOutsideClick: false,
+      background: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+      color: document.documentElement.classList.contains('dark') ? '#f1f5f9' : '#1e293b',
+      customClass: {
+        popup: 'rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl',
+      },
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://n8n.srv1297699.hstgr.cloud/webhook/5fd98266-fd63-4eb9-bfbe-cdfaace4dd3f';
+
+    try {
+      console.log('Attempting to submit form data to n8n webhook...');
+      console.log('Webhook URL:', webhookUrl);
+      console.log('Payload:', formData);
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook request failed with status ${response.status}`);
+      }
+
+      const responseText = await response.text();
+      let responseData;
+      try {
+        responseData = responseText ? JSON.parse(responseText) : { status: 'success' };
+      } catch (e) {
+        responseData = responseText;
+      }
+
+      console.log('n8n Webhook submission successful:', responseData);
+
+      Swal.fire({
+        title: i18n.language === 'ar' ? 'تم بنجاح!' : 'Success!',
+        text: i18n.language === 'ar' ? 'تم إرسال بياناتك بنجاح.' : 'Your data has been sent successfully.',
+        icon: 'success',
+        confirmButtonText: i18n.language === 'ar' ? 'حسناً' : 'OK',
+        confirmButtonColor: '#2563eb',
+        background: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#f1f5f9' : '#1e293b',
+        customClass: {
+          popup: 'rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl',
+          confirmButton: 'rounded-xl px-8 py-2.5 text-sm font-bold',
+        }
+      });
+    } catch (error) {
+      console.error('n8n Webhook submission error:', error);
+
+      Swal.fire({
+        title: i18n.language === 'ar' ? 'خطأ!' : 'Error!',
+        text: i18n.language === 'ar' ? 'حدث خطأ أثناء إرسال البيانات. يرجى المحاولة مرة أخرى.' : 'Something went wrong. Please try again.',
+        icon: 'error',
+        confirmButtonText: i18n.language === 'ar' ? 'إغلاق' : 'Close',
+        confirmButtonColor: '#ef4444',
+        background: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#f1f5f9' : '#1e293b',
+        customClass: {
+          popup: 'rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl',
+          confirmButton: 'rounded-xl px-8 py-2.5 text-sm font-bold',
+        }
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 
   const businessTypes = [
     { id: 'agency', icon: Users, popular: true },
@@ -172,7 +256,7 @@ const OnboardingForm = () => {
     switch (currentStep) {
       case 1:
         return (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -195,7 +279,7 @@ const OnboardingForm = () => {
                 </label>
                 <div className="relative group mt-2">
                   <User className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                  <Input 
+                  <Input
                     placeholder={t('onboarding.step1.name_placeholder')}
                     className={cn(
                       "h-10 ps-10 rounded-lg text-sm sm:text-base border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus-visible:ring-blue-500/40 focus-visible:border-blue-100",
@@ -219,7 +303,7 @@ const OnboardingForm = () => {
                 </label>
                 <div className="relative group mt-2">
                   <Mail className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                  <Input 
+                  <Input
                     placeholder={t('onboarding.step1.email_placeholder')}
                     className={cn(
                       "h-10 ps-10 rounded-lg text-sm sm:text-base border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus-visible:ring-blue-500/20 focus-visible:border-blue-50",
@@ -266,7 +350,7 @@ const OnboardingForm = () => {
         );
       case 2:
         return (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -292,8 +376,8 @@ const OnboardingForm = () => {
                     onClick={() => updateFormData({ businessType: type.id })}
                     className={cn(
                       "relative  cursor-pointer p-4 sm:p-6 text-start rounded-xl sm:rounded-2xl border-2 transition-all duration-300 group",
-                      isSelected 
-                        ? "border-blue-600 bg-white dark:bg-slate-900 shadow-xl shadow-blue-600/10" 
+                      isSelected
+                        ? "border-blue-600 bg-white dark:bg-slate-900 shadow-xl shadow-blue-600/10"
                         : "border-slate-100 dark:border-slate-800 hover:border-blue-200 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     )}
                   >
@@ -322,7 +406,7 @@ const OnboardingForm = () => {
         );
       case 3:
         return (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -341,7 +425,7 @@ const OnboardingForm = () => {
             <div className="space-y-6" >
               <div className={cn("space-y-2", formData.noWebsite && "opacity-50 pointer-events-none")}>
                 <label className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">{t('onboarding.step3.company_name')} <span className="text-blue-500">*</span></label>
-                <Input 
+                <Input
                   className={cn(
                     "h-10 rounded-lg mt-2 text-sm sm:text-base border-slate-200 dark:border-slate-800 focus-visible:ring-blue-500/40 focus-visible:border-blue-100",
                     getFieldError('companyName') && "border-red-500 focus-visible:ring-red-500/20"
@@ -367,7 +451,7 @@ const OnboardingForm = () => {
                 </div>
                 <div className="relative group mt-2">
                   <Globe className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
-                  <Input 
+                  <Input
                     disabled={formData.noWebsite}
                     className={cn(
                       "h-10 ps-10 rounded-lg text-sm sm:text-base border-blue-500/50 shadow-sm focus-visible:ring-blue-500/40 focus-visible:border-blue-100",
@@ -387,9 +471,9 @@ const OnboardingForm = () => {
               </div>
 
               <div className={cn("p-3 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4", formData.noWebsite && "border-blue-500 dark:border-blue-500 bg-blue-600/5 dark:bg-blue-600/10")}>
-                <Checkbox 
-                  id="noWebsite" 
-                  className="w-6 h-6 cursor-pointer rounded-lg data-[state=checked]:bg-blue-600 data-[state=checked]:border-none" 
+                <Checkbox
+                  id="noWebsite"
+                  className="w-6 h-6 cursor-pointer rounded-lg data-[state=checked]:bg-blue-600 data-[state=checked]:border-none"
                   checked={formData.noWebsite}
                   onCheckedChange={(checked) => updateFormData({ noWebsite: !!checked })}
                 />
@@ -412,7 +496,7 @@ const OnboardingForm = () => {
                       <label className="text-sm font-bold text-slate-800 dark:text-slate-200">{t('onboarding.step3.business_desc_label')}</label>
                       <span className="text-[10px] text-slate-400 font-medium">{t('onboarding.step3.business_desc_info')}</span>
                     </div>
-                    <textarea 
+                    <textarea
                       placeholder={t('onboarding.step3.business_desc_placeholder')}
                       className="w-full min-h-[100px] p-5 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 focus-visible:ring-blue-500/40 focus-visible:border-blue-100 bg-white dark:bg-slate-900 text-sm"
                       value={formData.businessDescription}
@@ -436,7 +520,7 @@ const OnboardingForm = () => {
                         const isSelected = formData.brandVoice.includes(voice);
                         const isOther = ['Other..', 'Other', 'آخر..', '其他..'].includes(voice);
                         const isSkip = voice === 'Skip this' || voice === 'Skip';
-                        
+
                         return (
                           <button
                             key={voice}
@@ -458,7 +542,7 @@ const OnboardingForm = () => {
                           </button>
                         );
                       })}
-                      
+
                       <button
                         onClick={() => toggleArrayItem('brandVoice', 'Skip this')}
                         className={cn(
@@ -472,7 +556,7 @@ const OnboardingForm = () => {
                         {t('onboarding.step3.skip')}
                       </button>
                     </div>
-                    
+
                     <AnimatePresence>
                       {formData.brandVoice.some(v => ['Other..', 'Other', 'آخر..', '其他..'].includes(v)) && (
                         <motion.div
@@ -481,7 +565,7 @@ const OnboardingForm = () => {
                           exit={{ opacity: 0, y: -10 }}
                           className="pt-2"
                         >
-                          <Input 
+                          <Input
                             placeholder={t('onboarding.step3.tell_us_more')}
                             className="h-12 rounded-xl border-blue-200 bg-blue-50/20 focus-visible:ring-blue-500/20"
                             value={formData.customBrandVoice}
@@ -506,8 +590,8 @@ const OnboardingForm = () => {
 
                     <div className={cn(
                       "p-10 rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 bg-slate-50/50 dark:bg-slate-950/50",
-                      formData.skippedBrandColors 
-                        ? "border-slate-100 opacity-40 cursor-not-allowed" 
+                      formData.skippedBrandColors
+                        ? "border-slate-100 opacity-40 cursor-not-allowed"
                         : "border-slate-200 dark:border-slate-800 hover:border-blue-300 hover:bg-blue-50/30"
                     )}>
                       <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 shadow-sm flex items-center justify-center">
@@ -528,7 +612,7 @@ const OnboardingForm = () => {
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {['primary', 'secondary', 'accent'].map((type) => (
-                          <div 
+                          <div
                             key={type}
                             onClick={() => {
                               if (!formData.skippedBrandColors) {
@@ -542,19 +626,19 @@ const OnboardingForm = () => {
                                 : "border-slate-100 dark:border-slate-800 hover:border-blue-200 cursor-pointer active:scale-[0.98]"
                             )}
                           >
-                            <input 
+                            <input
                               type="color"
                               id={`color-picker-${type}`}
                               className="sr-only"
                               value={(formData.brandColors as any)[type]}
                               onChange={(e) => {
-                                updateFormData({ 
+                                updateFormData({
                                   brandColors: { ...formData.brandColors, [type]: e.target.value },
                                   skippedBrandColors: false
                                 });
                               }}
                             />
-                            <div 
+                            <div
                               className="w-10 h-10 rounded-lg shadow-inner border border-slate-100 transition-colors duration-300"
                               style={{ backgroundColor: formData.skippedBrandColors ? '#f1f5f9' : (formData.brandColors as any)[type] }}
                             />
@@ -599,7 +683,7 @@ const OnboardingForm = () => {
                       {(t('onboarding.step3.customers', { returnObjects: true }) as string[]).map((customer) => {
                         const isSelected = formData.idealCustomer.includes(customer);
                         const isOther = ['Other..', 'Other', 'آخر..', '其他..'].includes(customer);
-                        
+
                         return (
                           <button
                             key={customer}
@@ -618,7 +702,7 @@ const OnboardingForm = () => {
                           </button>
                         );
                       })}
-                      
+
                       <button
                         onClick={() => toggleArrayItem('idealCustomer', 'Skip this')}
                         className={cn(
@@ -632,7 +716,7 @@ const OnboardingForm = () => {
                         {t('onboarding.step3.skip')}
                       </button>
                     </div>
-                    
+
                     <AnimatePresence>
                       {formData.idealCustomer.some(v => ['Other..', 'Other', 'آخر..', '其他..'].includes(v)) && (
                         <motion.div
@@ -641,7 +725,7 @@ const OnboardingForm = () => {
                           exit={{ opacity: 0, y: -10 }}
                           className="pt-2"
                         >
-                          <Input 
+                          <Input
                             placeholder={t('onboarding.step3.audience_placeholder')}
                             className="h-12 rounded-xl border-blue-200 bg-blue-50/20 focus-visible:ring-blue-500/20"
                             value={formData.customIdealCustomer}
@@ -672,7 +756,12 @@ const OnboardingForm = () => {
                   </div>
                   <div className="relative group">
                     <Instagram className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
-                    <Input placeholder="@yourbrand" className="h-10 ps-10 rounded-2xl border-slate-200 dark:border-slate-800" />
+                    <Input
+                      placeholder="@yourbrand"
+                      className="h-10 ps-10 rounded-2xl border-slate-200 dark:border-slate-800"
+                      value={formData.instagram}
+                      onChange={(e) => updateFormData({ instagram: e.target.value })}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -682,7 +771,12 @@ const OnboardingForm = () => {
                   </div>
                   <div className="relative group">
                     <Facebook className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
-                    <Input placeholder="facebook.com/yourbrand" className="h-10 ps-10 rounded-2xl border-slate-200 dark:border-slate-800" />
+                    <Input
+                      placeholder="facebook.com/yourbrand"
+                      className="h-10 ps-10 rounded-2xl border-slate-200 dark:border-slate-800"
+                      value={formData.facebook}
+                      onChange={(e) => updateFormData({ facebook: e.target.value })}
+                    />
                   </div>
                 </div>
               </div>
@@ -691,7 +785,7 @@ const OnboardingForm = () => {
         );
       case 4:
         return (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -794,7 +888,7 @@ const OnboardingForm = () => {
   };
 
   return (
-      <section suppressHydrationWarning id="marketing" className="py-20 px-4 sm:px-10 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
+    <section suppressHydrationWarning id="marketing" className="py-20 px-4 sm:px-10 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
       <div className="max-w-6xl mx-auto space-y-10">
         <div className="text-center">
           <h2 className="text-2xl sm:text-4xl font-black text-slate-900/90 dark:text-white tracking-tight">
@@ -840,7 +934,7 @@ const OnboardingForm = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-400 text-start leading-relaxed">
                       {t('marketing_form.cloud_storage_info')}
                     </p>
-                    <Button 
+                    <Button
                       className="bg-blue-600 hover:bg-blue-700 cursor-pointer text-white rounded-xl shadow-lg shadow-blue-500/20 text-xs sm:text-base px-3 sm:px-6 h-10 sm:h-11 font-bold transition-all active:scale-95"
                       onClick={() => window.open('https://dash.cloudflare.com/489491c88349f16290f6a620397fccc0/r2/overview', '_blank')}
                     >
@@ -851,7 +945,7 @@ const OnboardingForm = () => {
                 </div>
               </CardContent>
             </Card>
-            
+
             <div className="flex justify-center">
               <Button className="h-10 sm:h-12 px-10 sm:px-16 cursor-pointer bg-blue-600 hover:bg-blue-700 text-white rounded-full text-md sm:text-lg font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all">
                 {t('marketing_form.create_media_button')}
@@ -877,12 +971,12 @@ const OnboardingForm = () => {
               {/* Progress Bar */}
               <div className="flex gap-2 h-1.5 w-full mb-10">
                 {[1, 2, 3, 4].map(step => (
-                  <div 
-                    key={step} 
+                  <div
+                    key={step}
                     className={cn(
                       "flex-1 rounded-full transition-all duration-500",
                       currentStep >= step ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-800"
-                    )} 
+                    )}
                   />
                 ))}
               </div>
@@ -897,8 +991,8 @@ const OnboardingForm = () => {
                   {/* Footer Actions */}
                   <div className="mt-6 pt-6 sm:mt-10 sm:pt-10 border-t border-slate-50 dark:border-slate-800 flex flex-col items-center gap-8">
                     <div className="flex w-full justify-between items-center">
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         onClick={prevStep}
                         disabled={currentStep === 1}
                         className="rounded-lg cursor-pointer px-6 h-10 font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 hover:bg-transparent dark:hover:text-slate-200 dark:hover:bg-transparent disabled:opacity-20"
@@ -907,17 +1001,26 @@ const OnboardingForm = () => {
                         {t('onboarding.back')}
                       </Button>
 
-                      <Button 
-                        onClick={() => { if(isValid) nextStep(); }}
+                      <Button
+                        onClick={() => {
+                          if (isValid && !isSubmitting) {
+                            if (currentStep === 4) {
+                              handleSubmit();
+                            } else {
+                              nextStep();
+                            }
+                          }
+                        }}
+                        disabled={!isValid || isSubmitting}
                         className={cn(
                           "rounded-lg cursor-pointer text-xs sm:text-base px-4 sm:px-10 h-10 font-medium transition-all active:scale-95 text-white",
-                          isValid 
-                            ? "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20" 
+                          isValid && !isSubmitting
+                            ? "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20"
                             : "bg-slate-300 dark:bg-slate-700 cursor-not-allowed"
                         )}
                       >
-                        {currentStep === 4 ? t('onboarding.step4.build_profile') : t('onboarding.continue')}
-                        <ChevronRight className={cn("w-5 h-5", isRTL ? "mr-0.5 rotate-180" : "ml-0.5")} />
+                        {isSubmitting ? (i18n.language === 'ar' ? 'جاري الإرسال...' : 'Sending...') : (currentStep === 4 ? t('onboarding.step4.build_profile') : t('onboarding.continue'))}
+                        {!isSubmitting && <ChevronRight className={cn("w-5 h-5", isRTL ? "mr-0.5 rotate-180" : "ml-0.5")} />}
                       </Button>
                     </div>
                   </div>
@@ -926,7 +1029,7 @@ const OnboardingForm = () => {
             </div>
           </TabsContent>
         </Tabs>
-      </div>  
+      </div>
     </section>
   );
 };
