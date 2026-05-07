@@ -152,7 +152,7 @@ const OnboardingForm = () => {
     if (isSubmitting) return;
 
     setIsSubmitting(true);
-    
+
     Swal.fire({
       title: i18n.language === 'ar' ? 'جاري الإرسال...' : 'Sending...',
       allowOutsideClick: false,
@@ -166,23 +166,27 @@ const OnboardingForm = () => {
       }
     });
 
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://n8n.srv1297699.hstgr.cloud/webhook/5fd98266-fd63-4eb9-bfbe-cdfaace4dd3f';
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://n8n.srv1297699.hstgr.cloud/webhook/e1831354-34da-499c-a58b-de4681dfcbc8';
 
     try {
-      console.log('Attempting to submit form data to n8n webhook...');
-      console.log('Webhook URL:', webhookUrl);
+      console.log('FINAL WEBHOOK URL:', webhookUrl);
+      console.log('Initiating POST submission to:', webhookUrl);
       console.log('Payload:', formData);
 
       const response = await fetch(webhookUrl, {
         method: 'POST',
+        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify(formData),
+        cache: 'no-cache',
       });
 
       if (!response.ok) {
-        throw new Error(`Webhook request failed with status ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Webhook Error ${response.status}: ${errorText}`);
       }
 
       const responseText = await response.text();
@@ -190,7 +194,7 @@ const OnboardingForm = () => {
       try {
         responseData = responseText ? JSON.parse(responseText) : { status: 'success' };
       } catch (e) {
-        responseData = responseText;
+        responseData = { status: 'success', raw: responseText };
       }
 
       console.log('n8n Webhook submission successful:', responseData);
@@ -213,7 +217,7 @@ const OnboardingForm = () => {
 
       Swal.fire({
         title: i18n.language === 'ar' ? 'خطأ!' : 'Error!',
-        text: i18n.language === 'ar' ? 'حدث خطأ أثناء إرسال البيانات. يرجى المحاولة مرة أخرى.' : 'Something went wrong. Please try again.',
+        text: i18n.language === 'ar' ? 'حدث خطأ أثناء إرسال البيانات. يرجى التأكد من أن الـ Webhook مفعل ويقبل طلبات POST.' : 'Submission failed. Please ensure n8n Webhook is active and accepts POST requests.',
         icon: 'error',
         confirmButtonText: i18n.language === 'ar' ? 'إغلاق' : 'Close',
         confirmButtonColor: '#ef4444',
