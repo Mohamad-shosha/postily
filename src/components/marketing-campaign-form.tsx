@@ -166,7 +166,7 @@ const OnboardingForm = () => {
       }
     });
 
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://n8n.srv1297699.hstgr.cloud/webhook-test/e1831354-34da-499c-a58b-de4681dfcbc8';
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'https://n8n.srv1297699.hstgr.cloud/webhook/e1831354-34da-499c-a58b-de4681dfcbc8';
 
     try {
       console.log('FINAL WEBHOOK URL:', webhookUrl);
